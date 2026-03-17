@@ -1,0 +1,1 @@
+.\trivy.exe image --severity CRITICAL,HIGH,MEDIUM,LOW --format table sqldb-init-container:local-test

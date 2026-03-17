@@ -1,0 +1,7 @@
+# Large backup files
+*-backup.json
+cosmos_backup.json
+*.bak
+
+# Private work commands
+WorkRelatedCommands.md

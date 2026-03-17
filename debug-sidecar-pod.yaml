@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: debug-sidecar
+  namespace: feature-readonlyroot
+spec:
+  hostPID: true  # Shares host PID namespace — sees your app's PID 1
+  containers:
+  - name: debugger
+    image: mcr.microsoft.com/dotnet/sdk:8.0
+    command: ["/bin/sh", "-c"]
+    args:
+      - >
+        apt-get update && 
+        apt-get install -y procps curl bash && 
+        echo "Debugger ready. Run: bash" && 
+        sleep infinity
+    securityContext:
+      runAsUser: 0
+      runAsGroup: 0
+      capabilities:
+        add: ["SYS_PTRACE"]
+    volumeMounts:
+      - name: app-dir
+        mountPath: /app
+  volumes:
+    - name: app-dir
+      emptyDir: {}
+  restartPolicy: Never

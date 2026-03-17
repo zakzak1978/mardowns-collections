@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arch Viz: Ingress vs Gateway API</title>
+    <style>
+        :root {
+            --monolith-color: #ff6b6b;
+            --gateway-class-color: #845ef7;
+            --gateway-color: #5c7cfa;
+            --route-color: #51cf66;
+            --bg-color: #0f172a;
+            --text-color: #e2e8f0;
+            --panel-bg: #1e293b;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { margin-bottom: 2rem; border-bottom: 2px solid var(--gateway-color); padding-bottom: 0.5rem; }
+        .container { display: flex; gap: 4rem; flex-wrap: wrap; justify-content: center; width: 100%; max-width: 1200px; }
+        
+        .panel {
+            background: var(--panel-bg);
+            border-radius: 12px;
+            padding: 2rem;
+            width: 45%;
+            min-width: 350px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .panel-header { font-size: 1.5rem; font-weight: bold; margin-bottom: 1.5rem; text-align: center; }
+        .description { font-size: 0.9rem; color: #94a3b8; margin-bottom: 2rem; height: 60px; }
+
+        /* --- VISUALIZATION A: NGINX MONOLITH --- */
+        .monolith-container { height: 300px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
+        
+        .monolith {
+            width: 160px;
+            height: 160px;
+            background: var(--monolith-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+            border-radius: 8px;
+            position: relative;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 20px rgba(255, 107, 107, 0.2);
+            z-index: 2;
+        }
+
+        .annotation-wire {
+            position: absolute;
+            height: 2px;
+            background: #cbd5e1;
+            width: 0;
+            transition: width 0.5s ease;
+            z-index: 1;
+        }
+        
+        /* Simulating messy annotations */
+        .wire-1 { top: 20%; left: -50px; transform: rotate(15deg); }
+        .wire-2 { bottom: 30%; right: -50px; transform: rotate(-10deg); }
+        .wire-3 { top: -20px; left: 40%; transform: rotate(90deg); }
+
+        .btn {
+            margin-top: 20px;
+            padding: 10px 20px;
+            background: var(--text-color);
+            color: var(--bg-color);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.1s;
+        }
+        .btn:active { transform: scale(0.95); }
+
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        .shaking { animation: shake 0.5s; background: #c0392b; }
+
+        /* --- VISUALIZATION B: GATEWAY API --- */
+        .gateway-stack { height: 300px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 10px; position: relative; }
+
+        .layer {
+            width: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            border-radius: 6px;
+            position: relative;
+            opacity: 0.3;
+            transform: translateY(20px);
+            transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            font-size: 0.9rem;
+        }
+
+        .layer.active { opacity: 1; transform: translateY(0); }
+
+        .layer-infra { height: 50px; background: var(--gateway-class-color); width: 240px; }
+        .layer-ops { height: 60px; background: var(--gateway-color); width: 220px; }
+        .layer-dev { height: 40px; background: var(--route-color); margin-bottom: 5px; width: 100px; display: inline-flex; margin-right: 5px; font-size: 0.8rem; }
+        
+        .dev-layer-container { display: flex; justify-content: center; width: 100%; opacity: 0; transition: opacity 1s; }
+        .dev-layer-container.active { opacity: 1; }
+
+        .packet-stream {
+            position: absolute;
+            top: 0;
+            width: 4px;
+            height: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 0;
+            display: none;
+        }
+
+        .packet {
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: white;
+            border-radius: 50%;
+            top: -10px;
+            opacity: 0;
+        }
+
+        @keyframes flow {
+            0% { top: -10px; opacity: 1; }
+            100% { top: 280px; opacity: 0; }
+        }
+        
+        @keyframes flowLeft {
+            0% { top: 110px; left: 50%; opacity: 1; }
+            100% { top: 220px; left: 35%; opacity: 0; }
+        }
+        @keyframes flowRight {
+            0% { top: 110px; left: 50%; opacity: 1; }
+            100% { top: 220px; left: 65%; opacity: 0; }
+        }
+
+        .owner-tag {
+            position: absolute;
+            right: -80px;
+            font-size: 0.7rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            width: 70px;
+            text-align: left;
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>Architectural Evolution: Ingress vs. Gateway API</h1>
+
+    <div class="container">
+        <div class="panel">
+            <div class="panel-header" style="color: var(--monolith-color)">Legacy: Nginx Ingress</div>
+            <div class="description">
+                <strong>The Monolith Problem:</strong> A single resource handles infrastructure, security, and routing. 
+                Click "Add Feature" to see how brittle annotations make the system unstable.
+            </div>
+            
+            <div class="monolith-container">
+                <div class="monolith" id="monolith">
+                    Ingress<br>Controller
+                    <div class="wire-1 annotation-wire"></div>
+                    <div class="wire-2 annotation-wire"></div>
+                    <div class="wire-3 annotation-wire"></div>
+                </div>
+                <div id="annotation-list" style="margin-top: 20px; font-family: monospace; font-size: 0.8rem; color: #ff6b6b;"></div>
+            </div>
+            
+            <center><button class="btn" onclick="breakMonolith()">Add Annotation (Hack)</button></center>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header" style="color: var(--gateway-color)">Future: Gateway API</div>
+            <div class="description">
+                <strong>Decoupled Architecture:</strong> Distinct layers for distinct personas. 
+                Click "Build Stack" to provision resources layer by layer, then "Simulate Traffic" to see splitting.
+            </div>
+
+            <div class="gateway-stack" id="stack">
+                <div id="traffic-overlay" style="position: absolute; top:0; left:0; width:100%; height:100%; pointer-events:none;"></div>
+
+                <div class="dev-layer-container" id="layer-dev">
+                    <div class="layer layer-dev">Blue Route<br>(90%)</div>
+                    <div class="layer layer-dev" style="background: #20c997">Green Route<br>(10%)</div>
+                    <span class="owner-tag" style="top: 10px;">Devs</span>
+                </div>
+                
+                <div class="layer layer-ops" id="layer-ops">
+                    Gateway<br><span style="font-size:0.7rem; font-weight:normal">Listeners / TLS</span>
+                    <span class="owner-tag" style="top: 20px;">Cluster Ops</span>
+                </div>
+                
+                <div class="layer layer-infra" id="layer-infra">
+                    GatewayClass<br><span style="font-size:0.7rem; font-weight:normal">Infra Provider</span>
+                    <span class="owner-tag" style="top: 15px;">Platform Team</span>
+                </div>
+            </div>
+
+            <center style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
+                <button class="btn" onclick="buildStack()">1. Build Stack</button>
+                <button class="btn" onclick="simulateTraffic()" style="background: var(--route-color)">2. Traffic Split</button>
+            </center>
+        </div>
+    </div>
+
+    <script>
+        // --- Logic for Monolith ---
+        function breakMonolith() {
+            const mono = document.getElementById('monolith');
+            const list = document.getElementById('annotation-list');
+            
+            // Add visual shake
+            mono.classList.remove('shaking');
+            void mono.offsetWidth; // trigger reflow
+            mono.classList.add('shaking');
+
+            // Add text clutter
+            const hacks = [
+                'nginx.ingress.../snippet',
+                'nginx.ingress.../rewrite',
+                'nginx.ingress.../proxy-body'
+            ];
+            const randomHack = hacks[Math.floor(Math.random() * hacks.length)];
+            list.innerHTML += `> added ${randomHack}<br>`;
+            
+            // Limit list size
+            if(list.childElementCount > 3) list.innerHTML = `> SYSTEM CRITICAL: CONFLICT<br>`;
+        }
+
+        // --- Logic for Gateway API ---
+        function buildStack() {
+            document.getElementById('layer-infra').classList.add('active');
+            setTimeout(() => document.getElementById('layer-ops').classList.add('active'), 600);
+            setTimeout(() => document.getElementById('layer-dev').classList.add('active'), 1200);
+        }
+
+        function simulateTraffic() {
+            const overlay = document.getElementById('traffic-overlay');
+            
+            // Clear previous
+            overlay.innerHTML = '';
+
+            // Generate particles
+            for(let i=0; i<20; i++) {
+                createPacket(overlay, i * 200);
+            }
+        }
+
+        function createPacket(container, delay) {
+            const packet = document.createElement('div');
+            packet.classList.add('packet');
+            
+            // 90% go left (Blue), 10% go right (Green)
+            const isBlue = Math.random() > 0.1; 
+            
+            packet.style.background = isBlue ? 'white' : '#20c997'; // White for Blue route, Green for Green route
+            packet.style.left = '50%';
+            packet.style.top = '100px'; // Start at Gateway
+            
+            container.appendChild(packet);
+
+            const animation = packet.animate([
+                { top: '80px', transform: 'translateX(-50%)', opacity: 1 },
+                { top: '150px', transform: isBlue ? 'translateX(-80px)' : 'translateX(80px)', opacity: 0 }
+            ], {
+                duration: 1500,
+                delay: delay,
+                easing: 'cubic-bezier(0.4, 0, 0.2, 1)'
+            });
+
+            animation.onfinish = () => packet.remove();
+        }
+    </script>
+</body>
+</html>
